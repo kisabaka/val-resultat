@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Valkarta 2026</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav id="mobile-nav" aria-label="Växla vy">
+    <button data-view="map" class="active">Karta</button>
+    <button data-view="panel">Filter &amp; resultat</button>
+  </nav>
+
+  <aside id="sidebar">
+    <header>
+      <h1>Valkarta <span id="election-title">2026</span></h1>
+      <p class="muted" id="election-meta">Laddar…</p>
+    </header>
+
+    <section class="control">
+      <label class="control-label">Nivå</label>
+      <div class="segmented" id="level">
+        <button data-value="kommun" class="active">Kommun</button>
+        <button data-value="distrikt">Valdistrikt</button>
+      </div>
+    </section>
+
+    <section class="control">
+      <label class="control-label">Färg</label>
+      <div class="segmented" id="mode">
+        <button data-value="winner" class="active">Största parti</button>
+        <button data-value="party">Andel för ett parti</button>
+        <button data-value="block">Vänster vs höger</button>
+        <button data-value="turnout">Valdeltagande</button>
+      </div>
+      <div class="row" id="party-row" hidden>
+        <select id="party-select"></select>
+      </div>
+      <p class="hint" id="mode-hint"></p>
+    </section>
+
+    <section class="control" id="filter-section">
+      <div class="filter-head">
+        <span class="filter-title">Filter</span>
+        <span class="muted">Visa bara områden där…</span>
+      </div>
+      <div id="conditions"></div>
+      <button id="cond-add" class="link">+ Lägg till villkor</button>
+      <p class="hint" id="filter-status" hidden></p>
+      <div class="presets" id="presets">
+        <button data-conds='[{"lhs":"SD","op":"<=","rhs":10}]'>SD under 10 %</button>
+        <button data-conds='[{"lhs":"SD","op":">=","rhs":30}]'>SD över 30 %</button>
+        <button data-conds='[{"lhs":"vänster","op":">","rhs":"höger"}]'>Vänstern leder</button>
+        <button data-conds='[{"lhs":"höger","op":">","rhs":"vänster"}]'>Högern leder</button>
+        <button data-conds='[{"lhs":"M","op":">","rhs":"S"}]'>M större än S</button>
+        <button data-conds='[{"lhs":"valdeltagande","op":"<=","rhs":75}]'>Lågt valdeltagande</button>
+      </div>
+    </section>
+
+    <section class="control">
+      <label class="control-label">Block</label>
+      <div id="blocks"></div>
+    </section>
+
+    <section class="control">
+      <label class="control-label" for="search">Sök område</label>
+      <input id="search" type="search" placeholder="Kommun eller valdistrikt…" autocomplete="off">
+      <ul id="search-results" class="list" hidden></ul>
+    </section>
+
+    <section id="detail" class="control" hidden></section>
+
+    <section class="control">
+      <label class="control-label">Träffar <span class="muted" id="list-meta"></span></label>
+      <ol id="area-list" class="list"></ol>
+      <button id="list-more" class="link" hidden>Visa fler</button>
+    </section>
+
+    <footer class="muted">
+      <p>
+        Källa: <a href="https://resultat.val.se" target="_blank" rel="noopener">Valmyndigheten</a>.
+        Kommunsiffror inkluderar uppsamlingsdistrikt (förtids- och utlandsröster) som saknar karta.
+      </p>
+      <a class="repo" href="https://github.com/kisabaka/val-resultat" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+            0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52
+            -.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07
+            -1.78-.2-3.64-.89
+            -3.64-3.95
+            0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0
+            1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0
+            3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01
+            8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        Source code on GitHub
+      </a>
+    </footer>
+  </aside>
+
+  <main id="map-wrap">
+    <svg id="map" role="img" aria-label="Karta över Sverige med valresultat">
+      <g id="tiles"></g>
+      <g id="zoom-layer">
+        <g id="areas"></g>
+        <g id="borders"></g>
+        <g id="selection"></g>
+      </g>
+    </svg>
+    <div id="basemap-control">
+      <button id="basemap-on" class="map-btn" aria-pressed="false"
+        title="Visa OpenStreetMap under distrikten">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M1 3l4.5-2 5 2L15 1v12l-4.5 2-5-2L1 15zM5.5 2v11m5-9v11"
+            fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        </svg>
+        Vägar &amp; ortnamn
+      </button>
+      <div id="basemap-row" hidden>
+        <label class="range" title="Hur täckande färgfälten är över bakgrundskartan">
+          <span>Täckning</span>
+          <input type="range" id="fill-opacity" min="0.2" max="1" step="0.05" value="0.6">
+        </label>
+      </div>
+    </div>
+    <div id="legend"></div>
+    <div id="attribution" hidden></div>
+    <div id="zoom-controls">
+      <button id="zoom-in" title="Zooma in">+</button>
+      <button id="zoom-out" title="Zooma ut">−</button>
+      <button id="zoom-reset" title="Hela Sverige">⌂</button>
+    </div>
+    <div id="tooltip" hidden></div>
+    <div id="loading">Laddar karta och resultat…</div>
+  </main>
+
+
+  <script src="js/vendor/d3.v7.min.js"></script>
+  <script src="js/vendor/topojson-client.min.js"></script>
+  <script src="js/filter.js"></script>
+  <script src="js/app.js"></script>
+  <script data-goatcounter="https://myuselesstools.goatcounter.com/count"
+    async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
