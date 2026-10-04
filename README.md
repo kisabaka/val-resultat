@@ -103,8 +103,8 @@ python3 -m http.server 8000
 
 - **Level**: switch between municipalities and electoral districts.
   Double-click a municipality to zoom in and switch to its districts.
-- **Colour**: the largest party, the vote share of one party, left block versus right block,
-  or turnout.
+- **Colour**: left block versus right block (the default), the largest party,
+  or the vote share of one party.
   A line under the buttons explains the selected mode.
 - **Filter** (*Visa bara områden där…*): build conditions from dropdowns, with no syntax.
   Select what (a party, the left block, the right block or turnout),

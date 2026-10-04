@@ -184,7 +184,7 @@
   // ---------------------------------------------------------------- state ---
   const state = {
     level: "kommun",
-    mode: "winner",     // winner | party | block | turnout
+    mode: "block",      // block | winner | party
     party: parties.findIndex(p => p.abbr === "SD"),
     filter: null,       // compiled filter or null
     conditions: [],     // [{ lhs, op, rhs }] rows of the condition builder
@@ -216,14 +216,12 @@
   }
   const blockRamp = d3.piecewise(d3.interpolateLab,
     ["#1d4f91", "#7ea4d6", "#e6e6e6", "#e08a8a", "#b71c1c"]);
-  const turnoutRamp = t => d3.interpolateLab("#f4f1ec", "#2d5c3a")(t);
 
   function metric(s) {
     switch (state.mode) {
       case "winner": return s.winnerShare;
       case "party": return s.share[state.party];
       case "block": return s.margin;
-      case "turnout": return s.turnout;
     }
   }
 
@@ -244,11 +242,6 @@
       const spread = d3.quantile(values.map(Math.abs).sort(d3.ascending), 0.98);
       const m = Math.max(10, Math.ceil(spread / 10) * 10);
       scale = d3.scaleDiverging(blockRamp).domain([-m, 0, m]).clamp(true);
-    } else if (state.mode === "turnout") {
-      const sorted = values.sort(d3.ascending);
-      const lo = Math.floor(d3.quantile(sorted, 0.02) / 5) * 5;
-      const hi = Math.max(lo + 5, Math.ceil(d3.quantile(sorted, 0.99)));
-      scale = d3.scaleSequential(turnoutRamp).domain([lo, hi]).clamp(true);
     } else {
       scale = null;
     }
@@ -265,7 +258,6 @@
       case "winner": return s.winner >= 0 ? parties[s.winner].color : MISSING;
       case "party": return scale(s.share[state.party]);
       case "block": return scale(s.margin);
-      case "turnout": return s.turnout == null ? MISSING : scale(s.turnout);
     }
   }
 
@@ -325,8 +317,6 @@
     block: () => "Färgen visar vilket block som är störst i området och med hur mycket: " +
       "rött = vänsterblocket (S, V, C, MP) leder, blått = högerblocket (M, SD, KD, L) leder, " +
       "grått = jämnt.",
-    turnout: () => "Färgen visar hur stor andel av de röstberättigade som röstade: " +
-      "ljus = lågt valdeltagande, mörk = högt.",
   };
   function element(tag, className) {
     const el = document.createElement(tag);
@@ -353,7 +343,6 @@
     const [lo, hi] = [scale.domain()[0], scale.domain()[scale.domain().length - 1]];
     if (state.mode === "party") title.textContent = `Andel röster på ${parties[state.party].abbr}`;
     if (state.mode === "block") title.textContent = "Blockets försprång, procentenheter";
-    if (state.mode === "turnout") title.textContent = "Andel röstberättigade som röstade";
     el.appendChild(title);
     const bar = element("div", "legend-bar");
     const stops = d3.range(0, 1.001, 0.1).map(t => scale(lo + t * (hi - lo)));
@@ -543,7 +532,6 @@
       winner: "största partiets andel",
       party: parties[state.party].abbr + "-andel",
       block: "blockmarginal",
-      turnout: "valdeltagande",
     }[state.mode];
   }
   function listValue(r) {
@@ -836,7 +824,7 @@
     hashTimer = setTimeout(() => {
       const q = new URLSearchParams();
       if (state.level !== "kommun") q.set("level", state.level);
-      if (state.mode !== "winner") q.set("mode", state.mode);
+      if (state.mode !== "block") q.set("mode", state.mode);
       if (state.mode === "party") q.set("party", parties[state.party].abbr);
       if (state.conditions.length) {
         q.set("f", state.conditions.map(c => `${c.lhs},${c.op},${c.rhs}`).join(";"));
@@ -858,7 +846,7 @@
   function readHash() {
     const q = new URLSearchParams(location.hash.slice(1));
     if (q.get("level") in levels) state.level = q.get("level");
-    if (["winner", "party", "block", "turnout"].includes(q.get("mode"))) state.mode = q.get("mode");
+    if (["winner", "party", "block"].includes(q.get("mode"))) state.mode = q.get("mode");
     const pi = partyIndex.get((q.get("party") || "").toLowerCase());
     if (pi !== undefined) state.party = pi;
     state.conditions = (q.get("f") || "").split(";").filter(Boolean)
