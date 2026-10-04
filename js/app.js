@@ -766,19 +766,57 @@
   ];
   const searchInput = $("#search"), searchList = $("#search-results");
   const kommunFirst = (a, b) => (a.level === "kommun" ? 0 : 1) - (b.level === "kommun" ? 0 : 1);
-  searchInput.addEventListener("input", () => {
+
+  // Postal code -> [[district id, address count], ...] from scripts/build_postcodes.py.
+  // The file loads on the first search with digits.
+  let postcodes = null, postcodesRequest = null;
+  function loadPostcodes() {
+    postcodesRequest ??= d3.json("data/postcodes.json")
+      .then(d => { postcodes = d; }, () => { postcodes = {}; })
+      .then(renderSearch);
+  }
+  // A full postal code lists all its districts. A prefix lists the main district of each match.
+  function postcodeHits(digits) {
+    const hits = [];
+    for (const [code, entries] of Object.entries(postcodes)) {
+      if (!code.startsWith(digits)) continue;
+      const total = d3.sum(entries, e => e[1]);
+      for (const [id, n] of digits.length === 5 ? entries : entries.slice(0, 1)) {
+        const r = R.districts[id];
+        if (!r || !featureById.distrikt.has(id)) continue;
+        const kommun = R.kommuner[r.kommun]?.name || "";
+        hits.push({
+          level: "distrikt", id,
+          name: `${code.slice(0, 3)} ${code.slice(3)} · ${r.name}`,
+          sub: entries.length > 1 ? `${kommun}, ${Math.round(100 * n / total)} %` : kommun,
+        });
+      }
+      if (hits.length >= 12) break;
+    }
+    return hits.slice(0, 12);
+  }
+
+  function renderSearch() {
     const q = searchInput.value.trim().toLowerCase();
+    const digits = q.replace(/\s/g, "");
     if (q.length < 2) { searchList.hidden = true; return; }
-    const hits = searchIndex
-      .filter(x => x.name.toLowerCase().includes(q) || x.sub.toLowerCase().includes(q))
-      .sort((a, b) => kommunFirst(a, b) || a.name.localeCompare(b.name, "sv"))
-      .slice(0, 12);
+    let hits;
+    if (/^\d{3,5}$/.test(digits)) {
+      if (!postcodes) { loadPostcodes(); return; }
+      hits = postcodeHits(digits);
+    } else {
+      hits = searchIndex
+        .filter(x => x.name.toLowerCase().includes(q) || x.sub.toLowerCase().includes(q))
+        .sort((a, b) => kommunFirst(a, b) || a.name.localeCompare(b.name, "sv"))
+        .slice(0, 12);
+    }
     searchList.innerHTML = hits.map(h =>
       `<li data-level="${h.level}" data-id="${h.id}">` +
       `<span>${h.name}</span><span class="muted">${h.sub}</span></li>`)
       .join("") || `<li class="muted">Inga träffar</li>`;
     searchList.hidden = false;
-  });
+  }
+  searchInput.addEventListener("input", renderSearch);
   searchList.addEventListener("click", ev => {
     const li = ev.target.closest("li[data-id]"); if (!li) return;
     setLevel(li.dataset.level);

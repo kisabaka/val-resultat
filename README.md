@@ -38,6 +38,11 @@ curl -o raw/gadm41_SWE_0.json https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm
 
 # 3. Förenkla och bygg TopoJSON -> data/districts.topojson
 .venv/bin/python scripts/build_geo.py raw/valdistrikt-land.geojson
+
+# 4. Postnummer -> valdistrikt -> data/postcodes.json
+#    Adresserna kommer från OpenStreetMap (addr:postcode), cirka 30 sekunder.
+curl -o raw/sweden-latest.osm.pbf https://download.geofabrik.de/europe/sweden-latest.osm.pbf
+.venv/bin/python scripts/build_postcodes.py raw/sweden-latest.osm.pbf raw/valdistrikt-land.geojson
 ```
 
 ## Filter
@@ -62,6 +67,10 @@ De sparas i adressraden som `#f=SD,<=,10;vänster,>,höger`, så att en vy går 
   klippt mot GADM:s Sverigekontur, omprojicerad till WGS84 och förenklad till cirka 5 MB TopoJSON.
   Webbläsaren ritar den med `d3.geoMercator`,
   så att OpenStreetMaps kartrutor hamnar rätt under distrikten.
+* Postnummer: adresser med `addr:postcode` i OpenStreetMap (Geofabriks Sverigeextrakt).
+  Varje adress placeras i det valdistrikt som innehåller den.
+  Ett postnummer kan ligga i flera distrikt, och sökningen visar då andelen adresser i varje.
+  OSM saknar adresser i vissa områden, så alla postnummer finns inte.
 * Bakgrundskarta: `tile.openstreetmap.org`, hämtad direkt av webbläsaren när läget är påslaget.
   OSM:s [tile usage policy](https://operations.osmfoundation.org/policies/tiles/)
   tillåter lätt personlig användning.
@@ -71,7 +80,7 @@ Uppsamlingsdistrikt (förtids- och utlandsröster som räknas separat) saknar ge
 Deras röster ingår i kommunsiffrorna men visas inte som egna områden.
 
 Källa: Valmyndigheten (valresultat och valdistrikt), GADM (kustlinje),
-© OpenStreetMap contributors (bakgrundskarta).
+© OpenStreetMap contributors (bakgrundskarta och postnummer).
 
 ---
 
@@ -110,7 +119,10 @@ python3 -m http.server 8000
 - **Hover or tap** an area to see the name, the two block shares, the largest parties, the turnout
   and whether the area matches the filter.
   Click an area for the full breakdown in the panel.
-- **Search** for a municipality or a district by name.
+- **Search** for a municipality or a district by name, or for a postal code (postnummer).
+  A full postal code shows all districts that contain its addresses, with the share of addresses
+  in each.
+  Three or four digits show the matching postal codes.
 - The view (level, colour mode, filter, selection, basemap) is stored in the URL, so a view can be
   linked.
   Example: `#level=distrikt&mode=party&party=SD&f=SD,<=,10`.
@@ -137,6 +149,11 @@ curl -o raw/gadm41_SWE_0.json https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm
 
 # 3. Simplify and build the TopoJSON -> data/districts.topojson
 .venv/bin/python scripts/build_geo.py raw/valdistrikt-land.geojson
+
+# 4. Postal code -> district -> data/postcodes.json
+#    The addresses come from OpenStreetMap (addr:postcode). This takes about 30 seconds.
+curl -o raw/sweden-latest.osm.pbf https://download.geofabrik.de/europe/sweden-latest.osm.pbf
+.venv/bin/python scripts/build_postcodes.py raw/sweden-latest.osm.pbf raw/valdistrikt-land.geojson
 ```
 
 ### Data sources
@@ -149,6 +166,11 @@ curl -o raw/gadm41_SWE_0.json https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm
   clipped against the GADM outline of Sweden, reprojected to WGS84
   and simplified to a TopoJSON of about 5 MB.
   The browser draws it with `d3.geoMercator`, so the OpenStreetMap tiles line up under the districts.
+- Postal codes: the addresses with an `addr:postcode` tag in OpenStreetMap
+  (the Geofabrik extract for Sweden).
+  The script puts each address in the district that contains it.
+  There is no open official list of postal code areas.
+  OSM does not have addresses for all areas, so some postal codes are missing.
 - Basemap: `tile.openstreetmap.org`, requested by the browser when the basemap is on.
   The OSM [tile usage policy](https://operations.osmfoundation.org/policies/tiles/)
   permits light personal use.
@@ -161,4 +183,4 @@ Their votes are included in the municipality totals but they are not shown as ar
 Parties with less than 0.1 % of the national vote are grouped as "Övriga" (others).
 
 Sources: Valmyndigheten (results and districts), GADM (coastline),
-© OpenStreetMap contributors (basemap).
+© OpenStreetMap contributors (basemap and postal codes).
