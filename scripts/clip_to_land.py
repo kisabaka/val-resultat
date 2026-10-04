@@ -14,6 +14,7 @@ A district that does not intersect the land mask keeps its original geometry.
 import json
 import sys
 import time
+from pathlib import Path
 
 import pyproj
 import shapely.geometry
@@ -32,8 +33,7 @@ def polygonal(geom):
 
 def load_land(mask_path):
     """Return the land mask as a list of valid polygons in SWEREF99 TM."""
-    with open(mask_path, encoding="utf-8") as f:
-        mask = json.load(f)
+    mask = json.loads(mask_path.read_text(encoding="utf-8"))
     to_sweref = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:3006", always_xy=True).transform
     land = []
     for ft in mask["features"]:
@@ -50,8 +50,7 @@ def main(src, mask_path, out):
     tree = shapely.strtree.STRtree(land)
     print(f"land mask: {len(land)} polygons ({time.time() - t0:.0f}s)", file=sys.stderr)
 
-    with open(src, encoding="utf-8") as f:
-        gj = json.load(f)
+    gj = json.loads(src.read_text(encoding="utf-8"))
     kept, clipped, unchanged = 0, 0, 0
     for ft in gj["features"]:
         geom = shapely.geometry.shape(ft["geometry"])
@@ -75,9 +74,8 @@ def main(src, mask_path, out):
         clipped += 1
     print(f"inland {kept}, clipped {clipped}, unchanged {unchanged} ({time.time() - t0:.0f}s)",
           file=sys.stderr)
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump(gj, f)
+    out.write_text(json.dumps(gj), encoding="utf-8")
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:4])
+    main(*(Path(arg) for arg in sys.argv[1:4]))

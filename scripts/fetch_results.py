@@ -12,16 +12,16 @@ import argparse
 import concurrent.futures
 import functools
 import json
-import os
 import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 
 BASE = "https://resultat.val.se/data"
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RAW = os.path.join(ROOT, "raw")
-OUT = os.path.join(ROOT, "data", "results.json")
+ROOT = Path(__file__).resolve().parent.parent
+RAW = ROOT / "raw"
+OUT = ROOT / "data" / "results.json"
 UA = "election-map/1.0 (personal project; curl)"
 
 # resultat.val.se sits behind Akamai. Akamai answers 429 to bursts and blocks the urllib
@@ -58,9 +58,8 @@ def get(url, cache_path, retries=8):
     Raises:
         RuntimeError: All attempts failed.
     """
-    if os.path.exists(cache_path):
-        with open(cache_path, "rb") as f:
-            return json.load(f)
+    if cache_path.exists():
+        return json.loads(cache_path.read_bytes())
     for attempt in range(retries):
         _pace()
         proc = subprocess.run(
@@ -74,9 +73,8 @@ def get(url, cache_path, retries=8):
                 print(f"  bad json from {url}: {e}", file=sys.stderr)
                 time.sleep(2.0 * (attempt + 1))
                 continue
-            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-            with open(cache_path, "wb") as f:
-                f.write(body)
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_bytes(body)
             return data
         if code == b"429":
             wait = min(120, 10 * 2 ** attempt)
@@ -133,7 +131,7 @@ def fetch_result(path, valtillfalle, count):
     """Download the result file for one valgeografi path. Returns (path, result)."""
     name = "_".join(path) + f"_{count}.json"
     url = f"{BASE}/resultat/{valtillfalle}/{name}"
-    return path, get(url, os.path.join(RAW, valtillfalle, name))
+    return path, get(url, RAW / valtillfalle / name)
 
 
 def build_party_table(national, min_share):
@@ -198,7 +196,7 @@ def main():
 
     vt, cnt, vtf = args.valtyp, args.count, args.valtillfalle
     geo = get(f"{BASE}/valgeografi/valgeografi_{vtf}.json",
-              os.path.join(RAW, vtf, "valgeografi.json"))
+              RAW / vtf / "valgeografi.json")
     root = next(n for n in geo["valgeografi"] if n["kod"] == vt)
 
     nodes = []
@@ -253,10 +251,9 @@ def main():
             k["name"] = kommun_name_from_lan(r["namn"])
             out["kommuner"][d["kommun"]] = k
 
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"wrote {OUT} ({os.path.getsize(OUT) / 1e6:.1f} MB): "
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"wrote {OUT} ({OUT.stat().st_size / 1e6:.1f} MB): "
           f"{len(out['districts'])} districts, {len(out['kommuner'])} kommuner, "
           f"{len(parties)} parties", file=sys.stderr)
 

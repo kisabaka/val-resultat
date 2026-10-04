@@ -13,9 +13,9 @@ and unzip it into raw/ first. Run clip_to_land.py on it before this script.
 """
 import argparse
 import json
-import os
 import sys
 import time
+from pathlib import Path
 
 import pyproj
 import shapely.geometry
@@ -24,8 +24,8 @@ import shapely.ops
 import shapely.validation
 import topojson
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "data", "districts.topojson")
+ROOT = Path(__file__).resolve().parent.parent
+OUT = ROOT / "data" / "districts.topojson"
 
 # Source property name -> output property name.
 KEEP = {
@@ -65,7 +65,7 @@ def to_feature(ft, to_wgs84):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("geojson")
+    ap.add_argument("geojson", type=Path)
     ap.add_argument("--tolerance", type=float, default=25.0,
                     help="simplification tolerance in metres (default 25)")
     ap.add_argument("--quantize", type=float, default=1e6,
@@ -74,8 +74,7 @@ def main():
     to_wgs84 = pyproj.Transformer.from_crs("EPSG:3006", "EPSG:4326", always_xy=True).transform
 
     t0 = time.time()
-    with open(args.geojson, encoding="utf-8") as f:
-        gj = json.load(f)
+    gj = json.loads(args.geojson.read_text(encoding="utf-8"))
     print(f"loaded {len(gj['features'])} features ({time.time() - t0:.0f}s)", file=sys.stderr)
 
     feats = [to_feature(ft, to_wgs84) for ft in gj["features"]]
@@ -93,9 +92,8 @@ def main():
     print(f"topology built ({time.time() - t0:.0f}s)", file=sys.stderr)
 
     out = json.loads(topo.to_json())
-    with open(OUT, "w", encoding="utf-8") as f:
-        json.dump(out, f, separators=(",", ":"))
-    print(f"wrote {OUT} ({os.path.getsize(OUT) / 1e6:.1f} MB, "
+    OUT.write_text(json.dumps(out, separators=(",", ":")), encoding="utf-8")
+    print(f"wrote {OUT} ({OUT.stat().st_size / 1e6:.1f} MB, "
           f"{len(out['arcs'])} arcs, {time.time() - t0:.0f}s)", file=sys.stderr)
 
 

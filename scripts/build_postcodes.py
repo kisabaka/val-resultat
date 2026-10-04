@@ -18,10 +18,10 @@ The district file is the output of clip_to_land.py.
 import argparse
 import collections
 import json
-import os
 import re
 import sys
 import time
+from pathlib import Path
 
 import numpy
 import osmium
@@ -30,8 +30,8 @@ import pyproj
 import shapely
 import shapely.geometry
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "data", "postcodes.json")
+ROOT = Path(__file__).resolve().parent.parent
+OUT = ROOT / "data" / "postcodes.json"
 
 # Swedish postal codes have five digits and never start with 0.
 POSTCODE = re.compile(r"^[1-9]\d{4}$")
@@ -84,8 +84,7 @@ def read_addresses(pbf_path):
 
 def read_districts(geojson_path):
     """Return the district codes and shapely geometries from a GeoJSON file in SWEREF99 TM."""
-    with open(geojson_path, encoding="utf-8") as f:
-        gj = json.load(f)
+    gj = json.loads(geojson_path.read_text(encoding="utf-8"))
     ids = [ft["properties"]["Valdistriktskod"] for ft in gj["features"]]
     geoms = [shapely.make_valid(shapely.geometry.shape(ft["geometry"])) for ft in gj["features"]]
     return ids, geoms
@@ -110,8 +109,8 @@ def assign(points, geoms):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("pbf")
-    ap.add_argument("districts")
+    ap.add_argument("pbf", type=Path)
+    ap.add_argument("districts", type=Path)
     args = ap.parse_args()
 
     t0 = time.time()
@@ -132,9 +131,8 @@ def main():
     for code, c in sorted(counts.items()):
         total = c.total()
         out[code] = [(d, n) for d, n in c.most_common() if n >= MIN_SHARE * total]
-    with open(OUT, "w", encoding="utf-8") as f:
-        json.dump(out, f, separators=(",", ":"))
-    print(f"wrote {OUT} ({os.path.getsize(OUT) / 1e6:.1f} MB, {len(out)} postal codes, "
+    OUT.write_text(json.dumps(out, separators=(",", ":")), encoding="utf-8")
+    print(f"wrote {OUT} ({OUT.stat().st_size / 1e6:.1f} MB, {len(out)} postal codes, "
           f"{time.time() - t0:.0f}s)", file=sys.stderr)
 
 
